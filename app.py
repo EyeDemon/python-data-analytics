@@ -5,7 +5,7 @@ import seaborn as sns
 
 # Cấu hình trang
 st.set_page_config(page_title="Dashboard Tùy Chỉnh", layout="wide")
-st.title("Phân Tích Dữ Liệu Tự Do (Đã sửa lỗi hiển thị) 🛠️")
+st.title("Phân Tích Dữ Liệu Tự Do 🛠️")
 st.markdown("---")
 
 # --- HÀM ĐỌC DỮ LIỆU ---
@@ -30,21 +30,19 @@ if uploaded_file is not None:
     if df is not None:
         st.write(f"Đã tải file: **{uploaded_file.name}**")
         
-        # --- BƯỚC MỚI: TỰ ĐỘNG CHUYỂN ĐỔI SỐ ---
+        # --- BƯỚC MỚI: TỰ ĐỘNG CHUYỂN ĐỔI SỐ (FIX LỖI WARNING) ---
         # Tìm các cột có vẻ là số nhưng đang bị lưu là chữ
         for col in df.columns:
-            # Thử chuyển đổi sang số, nếu lỗi thì biến thành NaN
             if df[col].dtype == 'object':
                 try:
-                    # Xóa dấu phẩy hoặc chấm ngăn cách hàng nghìn nếu có
-                    # Lưu ý: Tùy file Excel mà dùng replace ',' hay '.'
-                    # Code này giả định format tiếng Anh (1,000.00)
-                    df[col] = df[col].astype(str).str.replace(',', '')
-                    df[col] = pd.to_numeric(df[col], errors='ignore')
+                    # Thử xóa dấu phẩy (1,000 -> 1000)
+                    # errors='coerce': Nếu không chuyển được thành số thì biến thành NaN (trống)
+                    # Đây là cách chuẩn mới, không gây Warning
+                    df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', ''), errors='coerce')
                 except:
                     pass
 
-        # Hiển thị bảng dữ liệu để kiểm tra
+        # Hiển thị bảng dữ liệu
         with st.expander("Xem dữ liệu chi tiết"):
             st.dataframe(df.head(100))
 
@@ -58,7 +56,7 @@ if uploaded_file is not None:
             x_column = st.selectbox("Chọn Trục X (Hoành):", all_columns)
             
         with col2:
-            # Chỉ cho phép chọn các cột đã được nhận diện là SỐ cho trục Y
+            # Chọn trục Y (Chỉ hiện các cột số thực sự)
             numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
             y_columns = st.multiselect("Chọn Trục Y (Tung):", numeric_cols)
             
@@ -69,14 +67,13 @@ if uploaded_file is not None:
             if len(y_columns) > 0:
                 st.subheader(f"Biểu đồ: {', '.join(y_columns)} theo {x_column}")
                 
-                # Logic xử lý dữ liệu trước khi vẽ
                 try:
-                    # Nếu trục X là chữ (ví dụ Tên Sản Phẩm), ta gom nhóm và tính tổng
+                    # Logic xử lý dữ liệu
                     if df[x_column].dtype == 'object' or len(df[x_column].unique()) < len(df)/2:
                         # Gom nhóm và tính tổng
                         chart_data = df.groupby(x_column)[y_columns].sum()
                     else:
-                        # Nếu trục X là số liệu liên tục (ví dụ Năm, Số lượng), ta sắp xếp lại rồi vẽ
+                        # Sắp xếp theo trục X
                         chart_data = df.set_index(x_column)[y_columns].sort_index()
 
                     # Vẽ biểu đồ
