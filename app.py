@@ -3,103 +3,96 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Cấu hình trang web rộng để hiển thị bảng lớn dễ hơn
-st.set_page_config(page_title="Dashboard Phân Tích Dữ Liệu Lớn", layout="wide")
-
-st.title("Phân Tích Dữ Liệu - Big Data Mode 🚀")
+# Cấu hình trang
+st.set_page_config(page_title="Dashboard Tùy Chỉnh", layout="wide")
+st.title("Phân Tích Dữ Liệu Tự Do 🛠️")
 st.markdown("---")
 
-# --- KỸ THUẬT 1: HÀM ĐỌC DỮ LIỆU CÓ CACHING ---
-# Hàm này giúp lưu dữ liệu vào bộ nhớ đệm, không cần load lại khi tương tác
+# --- HÀM ĐỌC DỮ LIỆU (Giữ nguyên để chạy nhanh) ---
 @st.cache_data
 def load_data(uploaded_file):
     try:
-        # Nếu là file CSV
         if uploaded_file.name.endswith('.csv'):
-            # Dùng low_memory=False để xử lý các cột hỗn hợp kiểu dữ liệu
             df = pd.read_csv(uploaded_file, low_memory=False)
-        # Nếu là file Excel
         else:
             df = pd.read_excel(uploaded_file)
         return df
     except Exception as e:
         return None
 
-# --- GIAO DIỆN UPLOAD ---
-sidebar = st.sidebar
-sidebar.header("Khu vực Upload")
-uploaded_file = sidebar.file_uploader("Chọn file dữ liệu lớn (CSV/Excel)", type=['csv', 'xlsx'])
+# --- UPLOAD FILE ---
+st.sidebar.header("Dữ liệu đầu vào")
+uploaded_file = st.sidebar.file_uploader("Upload file CSV/Excel", type=['csv', 'xlsx'])
 
 if uploaded_file is not None:
-    # Gọi hàm đọc dữ liệu thông minh
-    with st.spinner('Đang xử lý dữ liệu lớn... xin vui lòng chờ...'):
-        df = load_data(uploaded_file)
-
+    # Load data
+    df = load_data(uploaded_file)
+    
     if df is not None:
-        # --- KỸ THUẬT 2: HIỂN THỊ THÔNG MINH ---
-        # Chỉ hiện thông tin tổng quan để tránh lag
-        row_count = df.shape[0]
-        col_count = df.shape[1]
+        st.write(f"Đã tải file: **{uploaded_file.name}** ({df.shape[0]} dòng)")
         
-        st.success(f"✅ Đã tải thành công! Kích thước: {row_count:,} dòng, {col_count} cột.")
+        # Hiện bảng dữ liệu (trong Expander cho gọn)
+        with st.expander("Xem dữ liệu chi tiết"):
+            st.dataframe(df.head(1000))
+
+        # --- PHẦN TÙY CHỈNH BIỂU ĐỒ (MỚI) ---
+        st.header("Tùy chỉnh biểu đồ so sánh")
         
-        # Xem trước dữ liệu (Giới hạn hiển thị để mượt mà)
-        st.subheader("1. Xem trước dữ liệu")
-        with st.expander("Bấm để xem bảng dữ liệu chi tiết"):
-            if row_count > 1000:
-                st.warning("⚠️ File quá lớn, chỉ hiển thị 1000 dòng đầu tiên để tối ưu hiệu năng.")
-                st.dataframe(df.head(1000))
-            else:
-                st.dataframe(df)
-
-        # --- PHẦN PHÂN TÍCH TỰ ĐỘNG ---
-        st.subheader("2. Thống kê & Biểu đồ")
+        # Chia cột để chọn thông số
+        col1, col2, col3 = st.columns(3)
         
-        # Tự động lọc ra các cột SỐ và cột CHỮ
-        numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
-        object_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-
-        col1, col2 = st.columns([1, 2])
-
+        all_columns = df.columns.tolist()
+        
         with col1:
-            st.info("Tùy chọn vẽ biểu đồ")
-            # Chọn cột để phân tích
-            if object_cols:
-                cat_col = st.selectbox("Chọn cột phân nhóm (Trục X):", object_cols)
-            else:
-                cat_col = None
-                
-            if numeric_cols:
-                num_col = st.selectbox("Chọn cột giá trị (Trục Y):", numeric_cols)
-                chart_type = st.radio("Loại biểu đồ:", ["Cột (Bar)", "Đường (Line)", "Tròn (Pie)"])
-            else:
-                num_col = None
-
+            # Chọn trục X (Chỉ 1 cột)
+            x_column = st.selectbox("Chọn Trục X (Hoành):", all_columns)
+            
         with col2:
-            if cat_col and num_col:
-                st.markdown(f"**Biểu đồ thể hiện: {num_col} theo {cat_col}**")
-                
-                # Gom nhóm dữ liệu (Groupby) - Bước quan trọng để xử lý file lớn
-                # Thay vì vẽ 10.000 điểm, ta chỉ vẽ kết quả tổng hợp
-                df_grouped = df.groupby(cat_col)[num_col].sum().sort_values(ascending=False).head(15) # Chỉ lấy Top 15 để vẽ cho đẹp
-                
-                fig, ax = plt.subplots(figsize=(10, 5))
-                
-                if chart_type == "Cột (Bar)":
-                    sns.barplot(x=df_grouped.values, y=df_grouped.index, ax=ax, palette="viridis")
-                    ax.set_xlabel(num_col)
-                elif chart_type == "Đường (Line)":
-                    df_grouped.plot(kind='line', marker='o', ax=ax)
-                elif chart_type == "Tròn (Pie)":
-                    df_grouped.plot.pie(autopct='%1.1f%%', ax=ax)
-                    ax.set_ylabel('')
-                
-                st.pyplot(fig)
+            # Chọn trục Y (Nhiều cột)
+            y_columns = st.multiselect("Chọn Trục Y (Tung):", all_columns)
+            
+        with col3:
+            # Chọn loại biểu đồ
+            chart_type = st.selectbox("Loại biểu đồ:", ["Đường (Line)", "Cột (Bar)", "Phân tán (Scatter)", "Vùng (Area)"])
+
+        # Nút vẽ biểu đồ
+        if st.button("Vẽ biểu đồ ngay 🚀"):
+            if len(y_columns) > 0:
+                try:
+                    # Tạo khung vẽ
+                    st.subheader(f"Biểu đồ: {', '.join(y_columns)} theo {x_column}")
+                    
+                    # --- XỬ LÝ DỮ LIỆU TRƯỚC KHI VẼ ---
+                    # Nếu trục X là dạng chữ (ví dụ Tên Sản Phẩm), ta cần gom nhóm (Group By)
+                    # Nếu trục X là dạng số/ngày (ví dụ Nhiệt độ), ta vẽ trực tiếp
+                    
+                    # Kiểm tra xem X có nhiều giá trị trùng lặp không (để quyết định gom nhóm)
+                    if df[x_column].dtype == 'object' or len(df[x_column].unique()) < len(df):
+                        # Tự động tính tổng (Sum) cho các cột Y được chọn theo X
+                        chart_data = df.groupby(x_column)[y_columns].sum()
+                    else:
+                        # Dữ liệu dạng liên tục, set index là X để vẽ
+                        chart_data = df.set_index(x_column)[y_columns]
+
+                    # --- VẼ BIỂU ĐỒ ---
+                    if chart_type == "Cột (Bar)":
+                        st.bar_chart(chart_data)
+                    elif chart_type == "Đường (Line)":
+                        st.line_chart(chart_data)
+                    elif chart_type == "Vùng (Area)":
+                        st.area_chart(chart_data)
+                    elif chart_type == "Phân tán (Scatter)":
+                        # Scatter cần vẽ bằng Matplotlib/Seaborn vì Streamlit basic không hỗ trợ tốt scatter đa biến
+                        fig, ax = plt.subplots(figsize=(10, 6))
+                        for y_col in y_columns:
+                            sns.scatterplot(data=df, x=x_column, y=y_col, label=y_col, ax=ax)
+                        st.pyplot(fig)
+                        
+                except Exception as e:
+                    st.error(f"Không thể vẽ biểu đồ: {e}. \n(Gợi ý: Hãy đảm bảo Trục Y là cột SỐ).")
             else:
-                st.warning("Dữ liệu không đủ điều kiện để vẽ (cần ít nhất 1 cột chữ và 1 cột số).")
-
+                st.warning("Vui lòng chọn ít nhất 1 cột cho Trục Y.")
     else:
-        st.error("File bị lỗi hoặc không đọc được. Hãy kiểm tra lại định dạng.")
-
+        st.error("Lỗi đọc file.")
 else:
-    st.info("Chưa có file nào được chọn. Hãy upload file ở cột bên trái.")
+    st.info("Vui lòng upload file để bắt đầu.")
