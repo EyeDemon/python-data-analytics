@@ -224,24 +224,26 @@ class DataProcessor:
             return df
     
     @staticmethod
-    def clean_data(df: pd.DataFrame, remove_nulls: bool = True) -> Tuple[pd.DataFrame, dict]:
-        """Làm sạch dữ liệu"""
+    def clean_data(df: pd.DataFrame, remove_nulls: bool = False) -> Tuple[pd.DataFrame, dict]:
+        """Làm sạch dữ liệu - CHỈ xóa cột/hàng HOÀN TOÀN trống"""
         try:
             stats = {
                 'initial_rows': len(df),
                 'initial_cols': len(df.columns),
             }
             
-            # Xóa cột trống
-            df_cleaned = df.dropna(axis=1, how='all')
+            # CHỈ xóa cột HOÀN TOÀN trống (all NaN)
+            df_cleaned = df.dropna(axis=1, how='all').copy()
             stats['cols_removed'] = stats['initial_cols'] - len(df_cleaned.columns)
             
-            # Xóa hàng trống
+            # CHỈ xóa hàng HOÀN TOÀN trống (all NaN) - KHÔNG mặc định xóa
             if remove_nulls:
                 df_cleaned = df_cleaned.dropna(how='all')
+                stats['rows_removed'] = stats['initial_rows'] - len(df_cleaned)
+            else:
+                stats['rows_removed'] = 0
             
             stats['final_rows'] = len(df_cleaned)
-            stats['rows_removed'] = stats['initial_rows'] - stats['final_rows']
             
             logger.info(f"Data cleaned: {stats}")
             return df_cleaned, stats
@@ -431,7 +433,11 @@ class UIManager:
             x_column = st.selectbox("Trục X:", all_cols)
         
         with col2:
-            y_columns = st.multiselect("Trục Y:", numeric_cols)
+            y_columns = st.multiselect(
+                "Trục Y:", 
+                numeric_cols,
+                help="Chỉ chọn cột có giá trị số"
+            )
         
         with col3:
             chart_type = st.selectbox(
@@ -543,8 +549,8 @@ def main():
         if df is not None:
             st.success("✅ Tải dữ liệu thành công")
             
-            # Clean data
-            df, clean_stats = DataProcessor.clean_data(df)
+            # Clean data - KHÔNG tự động xóa hàng
+            df, clean_stats = DataProcessor.clean_data(df, remove_nulls=False)
             df = DataProcessor.convert_types(df)
             
             st.info(f"📊 {len(df)} dòng × {len(df.columns)} cột")
