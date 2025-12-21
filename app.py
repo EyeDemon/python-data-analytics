@@ -214,61 +214,129 @@ if df is not None:
                 st.warning("⚠️ Chọn ít nhất 1 cột cho Trục Y")
             else:
                 try:
-                    df_chart = df[[x_column] + y_columns].copy()
+                    # Bước 1: Kiểm tra dữ liệu đầu vào
+                    st.write("**🔍 Kiểm tra dữ liệu...**")
                     
-                    if remove_nulls:
-                        df_chart = df_chart.dropna(subset=y_columns)
+                    if x_column not in df.columns:
+                        st.error(f"❌ Cột '{x_column}' không tồn tại!")
+                        st.stop()
                     
-                    if use_groupby and df[x_column].dtype == 'object':
-                        chart_data = df_chart.groupby(x_column)[y_columns].sum()
-                    elif use_groupby and len(df[x_column].unique()) < len(df) / 2:
-                        chart_data = df_chart.groupby(x_column)[y_columns].sum()
-                    else:
-                        # Sắp xếp theo trục X trước khi set index
-                        df_chart = df_chart.sort_values(x_column)
-                        chart_data = df_chart.set_index(x_column)[y_columns]
+                    for col in y_columns:
+                        if col not in df.columns:
+                            st.error(f"❌ Cột '{col}' không tồn tại!")
+                            st.stop()
                     
-                    if sort_ascending:
-                        try:
-                            chart_data = chart_data.sort_index()
-                        except:
-                            pass  # Nếu không thể sort thì bỏ qua
+                    # Bước 2: Tạo bản sao dữ liệu
+                    try:
+                        df_chart = df[[x_column] + y_columns].copy()
+                        st.write(f"✅ Lấy {len(df_chart)} dòng dữ liệu")
+                    except Exception as e:
+                        st.error(f"❌ Lỗi khi lấy dữ liệu: {str(e)}")
+                        st.stop()
                     
-                    st.subheader(f"Biểu đồ: {', '.join(y_columns)} theo {x_column}")
-                    
-                    if "Cột" in chart_type:
-                        st.bar_chart(chart_data)
-                    elif "Đường" in chart_type:
-                        st.line_chart(chart_data)
-                    elif "Vùng" in chart_type:
-                        st.area_chart(chart_data)
-                    elif "Phân tán" in chart_type:
-                        fig, ax = plt.subplots(figsize=(figsize_width, figsize_height))
+                    # Bước 3: Xóa giá trị NaN
+                    try:
+                        if remove_nulls:
+                            rows_before = len(df_chart)
+                            df_chart = df_chart.dropna(subset=y_columns)
+                            rows_after = len(df_chart)
+                            st.write(f"✅ Xóa {rows_before - rows_after} dòng trống")
                         
-                        # Xóa NaN trước khi vẽ scatter
-                        df_scatter = df.dropna(subset=[x_column] + y_columns)
-                        
-                        if df_scatter[x_column].dtype == 'object':
-                            x_numeric = pd.factorize(df_scatter[x_column])[0]
-                            x_label = x_column
+                        if len(df_chart) == 0:
+                            st.error("❌ Không còn dữ liệu sau khi xóa giá trị trống!")
+                            st.stop()
+                    except Exception as e:
+                        st.error(f"❌ Lỗi khi xóa giá trị trống: {str(e)}")
+                        st.stop()
+                    
+                    # Bước 4: Xử lý dữ liệu
+                    try:
+                        if use_groupby and df[x_column].dtype == 'object':
+                            st.write("✅ Gom nhóm theo danh mục...")
+                            chart_data = df_chart.groupby(x_column)[y_columns].sum()
+                        elif use_groupby and len(df[x_column].unique()) < len(df) / 2:
+                            st.write("✅ Gom nhóm dữ liệu...")
+                            chart_data = df_chart.groupby(x_column)[y_columns].sum()
                         else:
-                            x_numeric = df_scatter[x_column]
-                            x_label = x_column
-                        
-                        for y_col in y_columns:
-                            ax.scatter(x_numeric, df_scatter[y_col], label=y_col, alpha=0.6, s=100)
-                        
-                        ax.set_xlabel(x_label)
-                        ax.set_ylabel("Giá trị")
-                        ax.legend()
-                        ax.grid(True, alpha=0.3)
-                        st.pyplot(fig)
+                            st.write("✅ Sắp xếp dữ liệu...")
+                            df_chart = df_chart.sort_values(x_column)
+                            chart_data = df_chart.set_index(x_column)[y_columns]
+                    except Exception as e:
+                        st.error(f"❌ Lỗi khi xử lý dữ liệu: {str(e)}")
+                        st.write(f"**Chi tiết:** {type(e).__name__}")
+                        st.stop()
                     
+                    # Bước 5: Sắp xếp
+                    try:
+                        if sort_ascending:
+                            chart_data = chart_data.sort_index()
+                            st.write("✅ Sắp xếp tăng dần")
+                    except Exception as e:
+                        st.warning(f"⚠️ Không thể sắp xếp: {str(e)}")
+                    
+                    # Bước 6: Vẽ biểu đồ
+                    st.subheader(f"📊 Biểu đồ: {', '.join(y_columns)} theo {x_column}")
+                    
+                    try:
+                        if "Cột" in chart_type:
+                            st.bar_chart(chart_data)
+                            st.success("✅ Vẽ biểu đồ cột thành công!")
+                        elif "Đường" in chart_type:
+                            st.line_chart(chart_data)
+                            st.success("✅ Vẽ biểu đồ đường thành công!")
+                        elif "Vùng" in chart_type:
+                            st.area_chart(chart_data)
+                            st.success("✅ Vẽ biểu đồ vùng thành công!")
+                        elif "Phân tán" in chart_type:
+                            st.write("✅ Vẽ biểu đồ phân tán...")
+                            fig, ax = plt.subplots(figsize=(figsize_width, figsize_height))
+                            
+                            # Xóa NaN trước khi vẽ scatter
+                            df_scatter = df.dropna(subset=[x_column] + y_columns)
+                            
+                            if len(df_scatter) == 0:
+                                st.error("❌ Không có dữ liệu hợp lệ để vẽ!")
+                                st.stop()
+                            
+                            if df_scatter[x_column].dtype == 'object':
+                                x_numeric = pd.factorize(df_scatter[x_column])[0]
+                                x_label = x_column
+                            else:
+                                x_numeric = df_scatter[x_column]
+                                x_label = x_column
+                            
+                            for y_col in y_columns:
+                                ax.scatter(x_numeric, df_scatter[y_col], label=y_col, alpha=0.6, s=100)
+                            
+                            ax.set_xlabel(x_label)
+                            ax.set_ylabel("Giá trị")
+                            ax.legend()
+                            ax.grid(True, alpha=0.3)
+                            st.pyplot(fig)
+                            st.success("✅ Vẽ biểu đồ phân tán thành công!")
+                    except Exception as e:
+                        st.error(f"❌ Lỗi khi vẽ biểu đồ: {str(e)}")
+                        st.write(f"**Chi tiết:** {type(e).__name__}")
+                        st.stop()
+                    
+                    # Bước 7: Hiển thị dữ liệu
                     with st.expander("📊 Xem dữ liệu biểu đồ"):
+                        st.write(f"**Kích thước:** {chart_data.shape[0]} dòng × {chart_data.shape[1]} cột")
                         st.dataframe(chart_data, width='stretch')
+                        
+                        # Tải CSV
+                        csv_data = chart_data.to_csv(encoding='utf-8-sig')
+                        st.download_button(
+                            "⬇️ Tải dữ liệu biểu đồ (CSV)",
+                            data=csv_data,
+                            file_name=f"chart_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv"
+                        )
                 
                 except Exception as e:
-                    st.error(f"❌ Lỗi: {str(e)}")
+                    st.error(f"❌ Lỗi không xác định: {str(e)}")
+                    st.write(f"**Loại lỗi:** {type(e).__name__}")
+                    st.write(f"**Dòng lỗi:** Kiểm tra console hoặc log")
     
     # --- TAB 3: THỐNG KÊ ---
     with tab3:
