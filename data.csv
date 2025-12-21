@@ -1,74 +1,129 @@
 import pandas as pd
 import numpy as np
+from datetime import datetime, timedelta
 
-# Tạo dữ liệu mẫu từ hình ảnh GitHub
+# Tạo dữ liệu mẫu
 np.random.seed(42)
 
-# Dữ liệu bán hàng sản phẩm công nghệ
-data = {
-    'Ngày': [
-        '2023-01-01', '2023-01-02', '2023-01-03', '2023-01-04', '2023-01-05',
-        '2023-01-06', '2023-01-07', '2023-01-08', '2023-01-09', '2023-01-10',
-        '2023-01-11', '2023-01-12', '2023-01-13', '2023-01-14', '2023-01-15',
-        '2023-01-16', '2023-01-17', '2023-01-18', '2023-01-19', '2023-01-20',
-    ] + [
-        '2023-02-01', '2023-02-02', '2023-02-03', '2023-02-04', '2023-02-05',
-        '2023-02-06', '2023-02-07', '2023-02-08', '2023-02-09', '2023-02-10',
-    ] + [
-        '2023-03-01', '2023-03-02', '2023-03-03', '2023-03-04', '2023-03-05',
-        '2023-03-06', '2023-03-07', '2023-03-08', '2023-03-09', '2023-03-10',
-    ],
-    
-    'SanPham': (
-        ['Laptop', 'Laptop', 'Chuột', 'Bàn phím', 'Laptop'] * 4 +
-        ['Laptop', 'Laptop', 'Chuột', 'Bàn phím', 'Tai nghe'] * 2 +
-        ['Laptop', 'Laptop', 'Chuột', 'Bàn phím', 'Laptop'] * 4
-    ),
-    
-    'SoLuong': [
-        1, 1, 5, 50, 1,
-        2, 1, 3, 20, 1,
-        1, 2, 8, 15, 2,
-        1, 1, 4, 30, 1,
-        1, 1, 6, 25, 3,
-        2, 1, 5, 18, 1,
-        1, 3, 7, 35, 1,
-        2, 1, 4, 22, 2,
-        1, 2, 5, 28, 1,
-        1, 1, 6, 32, 3,
-    ],
-    
-    'DoanThu': [
-        1500, 1500, 50, 100, 1500,
-        3000, 1500, 50, 100, 1500,
-        1500, 3000, 80, 150, 3000,
-        1500, 1500, 50, 100, 1500,
-        1500, 1500, 80, 150, 1500,
-        3000, 1500, 50, 100, 1500,
-        1500, 4500, 80, 150, 1500,
-        3000, 1500, 50, 100, 3000,
-        1500, 3000, 80, 150, 1500,
-        1500, 1500, 80, 150, 1500,
-    ],
-    
-    'KhuVuc': (
-        ['Hà Nội', 'Hà Nội', 'TP.HCM', 'Đà Nẵng', 'Hà Nội'] * 8 +
-        ['TP.HCM', 'Đà Nẵng']
-    )
+# ===== SHEET 1: BÁN HÀNG =====
+sales_data = {
+    'Ngày': pd.date_range('2024-01-01', periods=100),
+    'Sản phẩm': np.random.choice(['Laptop', 'Điện thoại', 'Tablet', 'Tai nghe', 'Chuột'], 100),
+    'Khu vực': np.random.choice(['Hà Nội', 'TP.HCM', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng'], 100),
+    'Số lượng': np.random.randint(1, 50, 100),
+    'Đơn giá (VNĐ)': np.random.choice([500000, 1000000, 1500000, 2000000, 3000000], 100),
+    'Doanh thu (VNĐ)': np.random.randint(500000, 50000000, 100),
+    'Lợi nhuận (%)': np.random.uniform(10, 40, 100).round(1)
 }
+df_sales = pd.DataFrame(sales_data)
+df_sales['Tổng tiền'] = df_sales['Số lượng'] * df_sales['Đơn giá (VNĐ)']
 
-# Tạo DataFrame
-df = pd.DataFrame(data)
+# ===== SHEET 2: NHÂN VIÊN =====
+employees_data = {
+    'Mã NV': [f'NV{i:03d}' for i in range(1, 51)],
+    'Họ tên': ['Nguyễn Văn A', 'Trần Thị B', 'Phạm Minh C', 'Hoàng Tuấn D', 'Lê Thu E',
+               'Vũ Hải F', 'Đặng Hoa G', 'Bùi Long H', 'Tô Minh I', 'Cao Thắng J'] * 5,
+    'Phòng ban': np.random.choice(['Bán hàng', 'Kỹ thuật', 'Tài chính', 'Marketing', 'Hành chính'], 50),
+    'Lương cơ bản': np.random.randint(5000000, 20000000, 50),
+    'Năm kinh nghiệm': np.random.randint(1, 15, 50),
+    'Ngày vào': pd.date_range('2015-01-01', periods=50, freq='M'),
+    'Đánh giá': np.random.choice(['Xuất sắc', 'Tốt', 'Trung bình', 'Cần cải thiện'], 50),
+    'Trạng thái': np.random.choice(['Đang làm', 'Thôi việc', 'Nghỉ phép'], 50)
+}
+df_employees = pd.DataFrame(employees_data)
 
-# Lưu vào CSV
-df.to_csv('data.csv', index=False, encoding='utf-8-sig')
+# ===== SHEET 3: KHÁCH HÀNG =====
+customers_data = {
+    'Mã khách': [f'KH{i:04d}' for i in range(1, 201)],
+    'Tên khách hàng': [f'Công ty {chr(65 + i%26)}{i}' for i in range(200)],
+    'Tỉnh thành': np.random.choice(['Hà Nội', 'TP.HCM', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng', 'Quảng Ninh', 'Huế', 'Nha Trang'], 200),
+    'Email': [f'contact{i}@company.com' for i in range(200)],
+    'Điện thoại': [f'0{np.random.randint(3,9)}{np.random.randint(10000000,99999999)}' for i in range(200)],
+    'Tổng chi tiêu': np.random.randint(1000000, 100000000, 200),
+    'Số lần mua': np.random.randint(1, 50, 200),
+    'Năm đăng ký': np.random.randint(2020, 2024, 200),
+    'Loại khách': np.random.choice(['VIP', 'Thường', 'Mới'], 200)
+}
+df_customers = pd.DataFrame(customers_data)
 
-print("✅ Tạo file data.csv thành công!")
-print(f"\n📊 Thông tin file:")
-print(f"  • Số dòng: {len(df)}")
-print(f"  • Số cột: {len(df.columns)}")
-print(f"  • Các cột: {', '.join(df.columns)}")
-print(f"\n📋 Dữ liệu mẫu:")
-print(df.head(10))
-print(f"\n📈 Thống kê:")
-print(df.describe())
+# ===== SHEET 4: SẢN PHẨM =====
+products_data = {
+    'Mã SP': [f'SP{i:04d}' for i in range(1, 101)],
+    'Tên sản phẩm': [f'Sản phẩm {i}' for i in range(1, 101)],
+    'Danh mục': np.random.choice(['Laptop', 'Điện thoại', 'Tablet', 'Phụ kiện', 'Dịch vụ'], 100),
+    'Giá bán': np.random.randint(500000, 50000000, 100),
+    'Giá vốn': np.random.randint(300000, 40000000, 100),
+    'Tồn kho': np.random.randint(0, 1000, 100),
+    'Đơn vị': np.random.choice(['Chiếc', 'Bộ', 'Hộp', 'Cái'], 100),
+    'Nhà cung cấp': np.random.choice(['Samsung', 'Apple', 'Intel', 'Dell', 'HP'], 100),
+    'Ngày cập nhật': pd.date_range('2024-01-01', periods=100, freq='D'),
+    'Tình trạng': np.random.choice(['Còn hàng', 'Hết hàng', 'Sắp hết'], 100)
+}
+df_products = pd.DataFrame(products_data)
+
+# ===== SHEET 5: DOANH SỐ THEO THÁNG =====
+months = pd.date_range('2023-01-01', '2024-12-31', freq='MS')
+revenue_data = {
+    'Tháng': [m.strftime('%Y-%m') for m in months],
+    'Hà Nội': np.random.randint(50000000, 200000000, len(months)),
+    'TP.HCM': np.random.randint(50000000, 200000000, len(months)),
+    'Đà Nẵng': np.random.randint(20000000, 100000000, len(months)),
+    'Cần Thơ': np.random.randint(15000000, 80000000, len(months)),
+    'Hải Phòng': np.random.randint(15000000, 80000000, len(months))
+}
+df_revenue = pd.DataFrame(revenue_data)
+df_revenue['Tổng cộng'] = df_revenue[['Hà Nội', 'TP.HCM', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng']].sum(axis=1)
+
+# ===== SHEET 6: THỐNG KÊ NHANH =====
+summary_data = {
+    'Chỉ số': [
+        'Tổng doanh thu',
+        'Tổng lợi nhuận',
+        'Số lượng khách hàng',
+        'Số lượng sản phẩm',
+        'Số nhân viên',
+        'Trung bình giá trị đơn hàng',
+        'Tỷ suất lợi nhuận'
+    ],
+    'Giá trị': [
+        f"{df_sales['Doanh thu (VNĐ)'].sum():,.0f}",
+        f"{(df_sales['Doanh thu (VNĐ)'].sum() * 0.25):,.0f}",
+        len(df_customers),
+        len(df_products),
+        len(df_employees),
+        f"{df_sales['Doanh thu (VNĐ)'].mean():,.0f}",
+        "25%"
+    ]
+}
+df_summary = pd.DataFrame(summary_data)
+
+# ===== TẠO FILE EXCEL =====
+with pd.ExcelWriter('sample_data.xlsx', engine='openpyxl') as writer:
+    df_sales.to_excel(writer, sheet_name='Bán hàng', index=False)
+    df_employees.to_excel(writer, sheet_name='Nhân viên', index=False)
+    df_customers.to_excel(writer, sheet_name='Khách hàng', index=False)
+    df_products.to_excel(writer, sheet_name='Sản phẩm', index=False)
+    df_revenue.to_excel(writer, sheet_name='Doanh số tháng', index=False)
+    df_summary.to_excel(writer, sheet_name='Thống kê', index=False)
+
+print("✅ Tạo file Excel thành công: sample_data.xlsx\n")
+print("📊 Nội dung file:")
+print(f"  1️⃣  Sheet 'Bán hàng': {len(df_sales)} dòng")
+print(f"      Cột: {', '.join(df_sales.columns.tolist())}\n")
+
+print(f"  2️⃣  Sheet 'Nhân viên': {len(df_employees)} dòng")
+print(f"      Cột: {', '.join(df_employees.columns.tolist())}\n")
+
+print(f"  3️⃣  Sheet 'Khách hàng': {len(df_customers)} dòng")
+print(f"      Cột: {', '.join(df_customers.columns.tolist())}\n")
+
+print(f"  4️⃣  Sheet 'Sản phẩm': {len(df_products)} dòng")
+print(f"      Cột: {', '.join(df_products.columns.tolist())}\n")
+
+print(f"  5️⃣  Sheet 'Doanh số tháng': {len(df_revenue)} dòng")
+print(f"      Cột: {', '.join(df_revenue.columns.tolist())}\n")
+
+print(f"  6️⃣  Sheet 'Thống kê': {len(df_summary)} dòng")
+print(f"      Cół: {', '.join(df_summary.columns.tolist())}\n")
+
+print("🚀 Bạn có thể upload file này vào Streamlit Dashboard!")
