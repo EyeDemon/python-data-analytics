@@ -1,23 +1,10 @@
 # Streamlit Dashboard Dependencies
-# Generated: 2025-12-21
+# Simplified version - works on Streamlit Cloud
 
-# Core Framework
 streamlit==1.40.2
-
-# Data Processing
 pandas==2.2.3
 numpy==1.26.4
-
-# Visualization
 matplotlib==3.9.2
 seaborn==0.13.2
-
-# Excel Support
 openpyxl==3.1.5
-
-# Additional useful libraries (optional)
 scipy==1.14.1
-scikit-learn==1.5.2
-
-# For better performance
-pyarrow==17.0.0
