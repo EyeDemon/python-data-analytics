@@ -113,11 +113,12 @@ elif data_source == "🔗 Từ GitHub":
 elif data_source == "📋 Dữ liệu mẫu":
     if st.sidebar.button("📥 Tải dữ liệu mẫu", use_container_width=True):
         # Tạo dữ liệu mẫu
+        np.random.seed(42)
         sample_data = {
             'Ngày': pd.date_range('2023-01-01', periods=50),
             'SanPham': np.random.choice(['Laptop', 'Chuột', 'Bàn phím', 'Tai nghe'], 50),
             'SoLuong': np.random.randint(1, 100, 50),
-            'DoanThu': np.random.randint(500, 5000, 50),
+            'DoanThu': np.random.randint(500000, 5000000, 50),
             'KhuVuc': np.random.choice(['Hà Nội', 'TP.HCM', 'Đà Nẵng', 'Cần Thơ'], 50)
         }
         df = pd.DataFrame(sample_data)
@@ -218,13 +219,20 @@ if df is not None:
                     if remove_nulls:
                         df_chart = df_chart.dropna(subset=y_columns)
                     
-                    if use_groupby:
+                    if use_groupby and df[x_column].dtype == 'object':
+                        chart_data = df_chart.groupby(x_column)[y_columns].sum()
+                    elif use_groupby and len(df[x_column].unique()) < len(df) / 2:
                         chart_data = df_chart.groupby(x_column)[y_columns].sum()
                     else:
+                        # Sắp xếp theo trục X trước khi set index
+                        df_chart = df_chart.sort_values(x_column)
                         chart_data = df_chart.set_index(x_column)[y_columns]
                     
                     if sort_ascending:
-                        chart_data = chart_data.sort_index()
+                        try:
+                            chart_data = chart_data.sort_index()
+                        except:
+                            pass  # Nếu không thể sort thì bỏ qua
                     
                     st.subheader(f"Biểu đồ: {', '.join(y_columns)} theo {x_column}")
                     
@@ -237,15 +245,18 @@ if df is not None:
                     elif "Phân tán" in chart_type:
                         fig, ax = plt.subplots(figsize=(figsize_width, figsize_height))
                         
-                        if df[x_column].dtype == 'object':
-                            x_numeric = pd.factorize(df[x_column])[0]
-                            x_label = "Nhóm"
+                        # Xóa NaN trước khi vẽ scatter
+                        df_scatter = df.dropna(subset=[x_column] + y_columns)
+                        
+                        if df_scatter[x_column].dtype == 'object':
+                            x_numeric = pd.factorize(df_scatter[x_column])[0]
+                            x_label = x_column
                         else:
-                            x_numeric = df[x_column]
+                            x_numeric = df_scatter[x_column]
                             x_label = x_column
                         
                         for y_col in y_columns:
-                            ax.scatter(x_numeric, df[y_col], label=y_col, alpha=0.6, s=100)
+                            ax.scatter(x_numeric, df_scatter[y_col], label=y_col, alpha=0.6, s=100)
                         
                         ax.set_xlabel(x_label)
                         ax.set_ylabel("Giá trị")
