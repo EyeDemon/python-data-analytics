@@ -1,338 +1,129 @@
-import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
 
-# ===== CẤU HÌNH TRANG =====
-st.set_page_config(
-    page_title="Dashboard Phân Tích Dữ Liệu",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# Tạo dữ liệu mẫu
+np.random.seed(42)
 
-# CSS tùy chỉnh
-st.markdown("""
-    <style>
-    .main { padding: 0rem 1rem; }
-    .metric-card { 
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px;
-        border-radius: 10px;
-        text-align: center;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# ===== SHEET 1: BÁN HÀNG =====
+sales_data = {
+    'Ngày': pd.date_range('2024-01-01', periods=100),
+    'Sản phẩm': np.random.choice(['Laptop', 'Điện thoại', 'Tablet', 'Tai nghe', 'Chuột'], 100),
+    'Khu vực': np.random.choice(['Hà Nội', 'TP.HCM', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng'], 100),
+    'Số lượng': np.random.randint(1, 50, 100),
+    'Đơn giá (VNĐ)': np.random.choice([500000, 1000000, 1500000, 2000000, 3000000], 100),
+    'Doanh thu (VNĐ)': np.random.randint(500000, 50000000, 100),
+    'Lợi nhuận (%)': np.random.uniform(10, 40, 100).round(1)
+}
+df_sales = pd.DataFrame(sales_data)
+df_sales['Tổng tiền'] = df_sales['Số lượng'] * df_sales['Đơn giá (VNĐ)']
 
-# ===== TIÊU ĐỀ =====
-st.title("📊 Dashboard Phân Tích Dữ Liệu")
-st.markdown("---")
+# ===== SHEET 2: NHÂN VIÊN =====
+employees_data = {
+    'Mã NV': [f'NV{i:03d}' for i in range(1, 51)],
+    'Họ tên': ['Nguyễn Văn A', 'Trần Thị B', 'Phạm Minh C', 'Hoàng Tuấn D', 'Lê Thu E',
+               'Vũ Hải F', 'Đặng Hoa G', 'Bùi Long H', 'Tô Minh I', 'Cao Thắng J'] * 5,
+    'Phòng ban': np.random.choice(['Bán hàng', 'Kỹ thuật', 'Tài chính', 'Marketing', 'Hành chính'], 50),
+    'Lương cơ bản': np.random.randint(5000000, 20000000, 50),
+    'Năm kinh nghiệm': np.random.randint(1, 15, 50),
+    'Ngày vào': pd.date_range('2015-01-01', periods=50, freq='M'),
+    'Đánh giá': np.random.choice(['Xuất sắc', 'Tốt', 'Trung bình', 'Cần cải thiện'], 50),
+    'Trạng thái': np.random.choice(['Đang làm', 'Thôi việc', 'Nghỉ phép'], 50)
+}
+df_employees = pd.DataFrame(employees_data)
 
-# ===== CÁC HÀM HỖ TRỢ =====
-@st.cache_data
-def load_data(uploaded_file):
-    """Đọc file CSV hoặc Excel"""
-    try:
-        if uploaded_file.name.endswith('.csv'):
-            df = pd.read_csv(uploaded_file, low_memory=False)
-        elif uploaded_file.name.endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(uploaded_file)
-        else:
-            return None
-        return df
-    except Exception as e:
-        st.error(f"❌ Lỗi khi đọc file: {str(e)}")
-        return None
+# ===== SHEET 3: KHÁCH HÀNG =====
+customers_data = {
+    'Mã khách': [f'KH{i:04d}' for i in range(1, 201)],
+    'Tên khách hàng': [f'Công ty {chr(65 + i%26)}{i}' for i in range(200)],
+    'Tỉnh thành': np.random.choice(['Hà Nội', 'TP.HCM', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng', 'Quảng Ninh', 'Huế', 'Nha Trang'], 200),
+    'Email': [f'contact{i}@company.com' for i in range(200)],
+    'Điện thoại': [f'0{np.random.randint(3,9)}{np.random.randint(10000000,99999999)}' for i in range(200)],
+    'Tổng chi tiêu': np.random.randint(1000000, 100000000, 200),
+    'Số lần mua': np.random.randint(1, 50, 200),
+    'Năm đăng ký': np.random.randint(2020, 2024, 200),
+    'Loại khách': np.random.choice(['VIP', 'Thường', 'Mới'], 200)
+}
+df_customers = pd.DataFrame(customers_data)
 
-@st.cache_data
-def load_csv_from_url(url):
-    """Đọc CSV từ GitHub"""
-    try:
-        df = pd.read_csv(url)
-        return df
-    except Exception as e:
-        st.error(f"❌ Lỗi khi tải từ URL: {str(e)}")
-        return None
+# ===== SHEET 4: SẢN PHẨM =====
+products_data = {
+    'Mã SP': [f'SP{i:04d}' for i in range(1, 101)],
+    'Tên sản phẩm': [f'Sản phẩm {i}' for i in range(1, 101)],
+    'Danh mục': np.random.choice(['Laptop', 'Điện thoại', 'Tablet', 'Phụ kiện', 'Dịch vụ'], 100),
+    'Giá bán': np.random.randint(500000, 50000000, 100),
+    'Giá vốn': np.random.randint(300000, 40000000, 100),
+    'Tồn kho': np.random.randint(0, 1000, 100),
+    'Đơn vị': np.random.choice(['Chiếc', 'Bộ', 'Hộp', 'Cái'], 100),
+    'Nhà cung cấp': np.random.choice(['Samsung', 'Apple', 'Intel', 'Dell', 'HP'], 100),
+    'Ngày cập nhật': pd.date_range('2024-01-01', periods=100, freq='D'),
+    'Tình trạng': np.random.choice(['Còn hàng', 'Hết hàng', 'Sắp hết'], 100)
+}
+df_products = pd.DataFrame(products_data)
 
-def auto_convert_dtypes(df):
-    """Chuyển đổi kiểu dữ liệu tự động"""
-    df_converted = df.copy()
-    
-    for col in df_converted.columns:
-        if df_converted[col].dtype == 'object':
-            df_converted[col] = df_converted[col].astype(str).str.strip()
-            
-            try:
-                df_converted[col] = pd.to_numeric(
-                    df_converted[col].str.replace(',', '', regex=False),
-                    errors='coerce'
-                )
-            except:
-                pass
-            
-            if df_converted[col].dtype == 'object':
-                try:
-                    df_converted[col] = pd.to_datetime(
-                        df_converted[col],
-                        errors='coerce'
-                    )
-                except:
-                    pass
-    
-    return df_converted
+# ===== SHEET 5: DOANH SỐ THEO THÁNG =====
+months = pd.date_range('2023-01-01', '2024-12-31', freq='MS')
+revenue_data = {
+    'Tháng': [m.strftime('%Y-%m') for m in months],
+    'Hà Nội': np.random.randint(50000000, 200000000, len(months)),
+    'TP.HCM': np.random.randint(50000000, 200000000, len(months)),
+    'Đà Nẵng': np.random.randint(20000000, 100000000, len(months)),
+    'Cần Thơ': np.random.randint(15000000, 80000000, len(months)),
+    'Hải Phòng': np.random.randint(15000000, 80000000, len(months))
+}
+df_revenue = pd.DataFrame(revenue_data)
+df_revenue['Tổng cộng'] = df_revenue[['Hà Nội', 'TP.HCM', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng']].sum(axis=1)
 
-# ===== SIDEBAR - NHẬP DỮ LIỆU =====
-st.sidebar.header("📁 Dữ liệu đầu vào")
+# ===== SHEET 6: THỐNG KÊ NHANH =====
+summary_data = {
+    'Chỉ số': [
+        'Tổng doanh thu',
+        'Tổng lợi nhuận',
+        'Số lượng khách hàng',
+        'Số lượng sản phẩm',
+        'Số nhân viên',
+        'Trung bình giá trị đơn hàng',
+        'Tỷ suất lợi nhuận'
+    ],
+    'Giá trị': [
+        f"{df_sales['Doanh thu (VNĐ)'].sum():,.0f}",
+        f"{(df_sales['Doanh thu (VNĐ)'].sum() * 0.25):,.0f}",
+        len(df_customers),
+        len(df_products),
+        len(df_employees),
+        f"{df_sales['Doanh thu (VNĐ)'].mean():,.0f}",
+        "25%"
+    ]
+}
+df_summary = pd.DataFrame(summary_data)
 
-data_source = st.sidebar.radio(
-    "Chọn nguồn dữ liệu:",
-    ["📤 Upload file", "🔗 Từ GitHub", "📋 Dữ liệu mẫu"]
-)
+# ===== TẠO FILE EXCEL =====
+with pd.ExcelWriter('sample_data.xlsx', engine='openpyxl') as writer:
+    df_sales.to_excel(writer, sheet_name='Bán hàng', index=False)
+    df_employees.to_excel(writer, sheet_name='Nhân viên', index=False)
+    df_customers.to_excel(writer, sheet_name='Khách hàng', index=False)
+    df_products.to_excel(writer, sheet_name='Sản phẩm', index=False)
+    df_revenue.to_excel(writer, sheet_name='Doanh số tháng', index=False)
+    df_summary.to_excel(writer, sheet_name='Thống kê', index=False)
 
-df = None
+print("✅ Tạo file Excel thành công: sample_data.xlsx\n")
+print("📊 Nội dung file:")
+print(f"  1️⃣  Sheet 'Bán hàng': {len(df_sales)} dòng")
+print(f"      Cột: {', '.join(df_sales.columns.tolist())}\n")
 
-if data_source == "📤 Upload file":
-    uploaded_file = st.sidebar.file_uploader(
-        "Chọn file CSV/Excel",
-        type=['csv', 'xlsx', 'xls']
-    )
-    if uploaded_file is not None:
-        df = load_data(uploaded_file)
+print(f"  2️⃣  Sheet 'Nhân viên': {len(df_employees)} dòng")
+print(f"      Cột: {', '.join(df_employees.columns.tolist())}\n")
 
-elif data_source == "🔗 Từ GitHub":
-    github_url = st.sidebar.text_input(
-        "Nhập URL raw từ GitHub:",
-        "https://raw.githubusercontent.com/YOUR_USERNAME/REPO/main/data.csv"
-    )
-    if st.sidebar.button("📥 Tải dữ liệu", use_container_width=True):
-        df = load_csv_from_url(github_url)
+print(f"  3️⃣  Sheet 'Khách hàng': {len(df_customers)} dòng")
+print(f"      Cột: {', '.join(df_customers.columns.tolist())}\n")
 
-elif data_source == "📋 Dữ liệu mẫu":
-    if st.sidebar.button("📥 Tải dữ liệu mẫu", use_container_width=True):
-        # Tạo dữ liệu mẫu
-        sample_data = {
-            'Ngày': pd.date_range('2023-01-01', periods=50),
-            'SanPham': np.random.choice(['Laptop', 'Chuột', 'Bàn phím', 'Tai nghe'], 50),
-            'SoLuong': np.random.randint(1, 100, 50),
-            'DoanThu': np.random.randint(500, 5000, 50),
-            'KhuVuc': np.random.choice(['Hà Nội', 'TP.HCM', 'Đà Nẵng', 'Cần Thơ'], 50)
-        }
-        df = pd.DataFrame(sample_data)
+print(f"  4️⃣  Sheet 'Sản phẩm': {len(df_products)} dòng")
+print(f"      Cột: {', '.join(df_products.columns.tolist())}\n")
 
-# ===== XỬ LÝ DỮ LIỆU =====
-if df is not None:
-    st.success(f"✅ Đã tải dữ liệu thành công!")
-    st.info(f"📊 Kích thước: {df.shape[0]} dòng × {df.shape[1]} cột")
-    
-    # Chuyển đổi kiểu dữ liệu
-    df = auto_convert_dtypes(df)
-    df = df.dropna(how='all')
-    
-    # ===== TAB 1: DỮ LIỆU =====
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "📋 Dữ liệu",
-        "📈 Biểu đồ",
-        "📊 Thống kê",
-        "🔍 Phân tích"
-    ])
-    
-    # --- TAB 1: DỮ LIỆU ---
-    with tab1:
-        st.header("Dữ liệu chi tiết")
-        
-        col_preview, col_info = st.columns([2, 1])
-        
-        with col_preview:
-            st.write("**Dữ liệu mẫu (20 dòng đầu):**")
-            st.dataframe(df.head(20), width='stretch')
-        
-        with col_info:
-            st.write("**Thông tin cơ bản:**")
-            st.metric("Tổng dòng", len(df))
-            st.metric("Tổng cột", df.shape[1])
-            st.metric("Kiểu dữ liệu", len(df.dtypes))
-        
-        # Tải file
-        csv = df.to_csv(index=False, encoding='utf-8-sig')
-        st.download_button(
-            label="⬇️ Tải CSV",
-            data=csv,
-            file_name=f"data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-    
-    # --- TAB 2: BIỂU ĐỒ ---
-    with tab2:
-        st.header("Tùy chỉnh biểu đồ")
-        
-        col1, col2, col3 = st.columns(3)
-        all_columns = df.columns.tolist()
-        numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
-        
-        with col1:
-            x_column = st.selectbox(
-                "Trục X (Hoành):",
-                all_columns,
-                help="Trục ngang - danh mục hoặc thời gian"
-            )
-        
-        with col2:
-            y_columns = st.multiselect(
-                "Trục Y (Tung):",
-                numeric_cols,
-                help="Chỉ hiện các cột số"
-            )
-        
-        with col3:
-            chart_type = st.selectbox(
-                "Loại biểu đồ:",
-                ["📊 Cột (Bar)", "📈 Đường (Line)", "📉 Vùng (Area)", "🔵 Phân tán (Scatter)"]
-            )
-        
-        # Tùy chọn nâng cao
-        with st.expander("⚙️ Tùy chọn nâng cao"):
-            col_adv1, col_adv2, col_adv3 = st.columns(3)
-            
-            with col_adv1:
-                use_groupby = st.checkbox("Gom nhóm dữ liệu", value=True)
-                sort_ascending = st.checkbox("Sắp xếp tăng dần", value=True)
-            
-            with col_adv2:
-                figsize_width = st.slider("Chiều rộng", 8, 16, 10)
-                figsize_height = st.slider("Chiều cao", 4, 12, 6)
-            
-            with col_adv3:
-                remove_nulls = st.checkbox("Xóa giá trị trống", value=True)
-        
-        if st.button("🚀 Vẽ biểu đồ", use_container_width=True):
-            if len(y_columns) == 0:
-                st.warning("⚠️ Chọn ít nhất 1 cột cho Trục Y")
-            else:
-                try:
-                    df_chart = df[[x_column] + y_columns].copy()
-                    
-                    if remove_nulls:
-                        df_chart = df_chart.dropna(subset=y_columns)
-                    
-                    if use_groupby:
-                        chart_data = df_chart.groupby(x_column)[y_columns].sum()
-                    else:
-                        chart_data = df_chart.set_index(x_column)[y_columns]
-                    
-                    if sort_ascending:
-                        chart_data = chart_data.sort_index()
-                    
-                    st.subheader(f"Biểu đồ: {', '.join(y_columns)} theo {x_column}")
-                    
-                    if "Cột" in chart_type:
-                        st.bar_chart(chart_data)
-                    elif "Đường" in chart_type:
-                        st.line_chart(chart_data)
-                    elif "Vùng" in chart_type:
-                        st.area_chart(chart_data)
-                    elif "Phân tán" in chart_type:
-                        fig, ax = plt.subplots(figsize=(figsize_width, figsize_height))
-                        
-                        if df[x_column].dtype == 'object':
-                            x_numeric = pd.factorize(df[x_column])[0]
-                            x_label = "Nhóm"
-                        else:
-                            x_numeric = df[x_column]
-                            x_label = x_column
-                        
-                        for y_col in y_columns:
-                            ax.scatter(x_numeric, df[y_col], label=y_col, alpha=0.6, s=100)
-                        
-                        ax.set_xlabel(x_label)
-                        ax.set_ylabel("Giá trị")
-                        ax.legend()
-                        ax.grid(True, alpha=0.3)
-                        st.pyplot(fig)
-                    
-                    with st.expander("📊 Xem dữ liệu biểu đồ"):
-                        st.dataframe(chart_data, width='stretch')
-                
-                except Exception as e:
-                    st.error(f"❌ Lỗi: {str(e)}")
-    
-    # --- TAB 3: THỐNG KÊ ---
-    with tab3:
-        st.header("Thống kê dữ liệu")
-        
-        numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
-        
-        if numeric_cols:
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.metric("📊 Tổng dòng", len(df))
-            with col2:
-                st.metric("📈 Cột số", len(numeric_cols))
-            with col3:
-                st.metric("📉 Cột chữ", df.shape[1] - len(numeric_cols))
-            with col4:
-                st.metric("🔢 Tổng cột", df.shape[1])
-            
-            st.write("**Thống kê chi tiết:**")
-            st.dataframe(df.describe().T, width='stretch')
-            
-            # Ma trận tương quan
-            if len(numeric_cols) > 1:
-                with st.expander("🔗 Ma trận tương quan"):
-                    corr_matrix = df[numeric_cols].corr()
-                    fig, ax = plt.subplots(figsize=(10, 8))
-                    sns.heatmap(corr_matrix, annot=True, fmt='.2f', cmap='coolwarm', ax=ax)
-                    st.pyplot(fig)
-    
-    # --- TAB 4: PHÂN TÍCH ---
-    with tab4:
-        st.header("Phân tích dữ liệu")
-        
-        col_a1, col_a2 = st.columns(2)
-        
-        with col_a1:
-            st.write("**Phân bố dữ liệu theo cột:**")
-            analyze_col = st.selectbox("Chọn cột để phân tích:", df.columns.tolist())
-            
-            if df[analyze_col].dtype in ['float64', 'int64']:
-                fig, ax = plt.subplots()
-                df[analyze_col].hist(bins=30, ax=ax, color='skyblue', edgecolor='black')
-                ax.set_title(f"Phân bố {analyze_col}")
-                ax.set_xlabel("Giá trị")
-                ax.set_ylabel("Tần số")
-                st.pyplot(fig)
-            else:
-                fig, ax = plt.subplots()
-                df[analyze_col].value_counts().head(10).plot(kind='bar', ax=ax, color='coral')
-                ax.set_title(f"Top 10 {analyze_col}")
-                ax.set_xlabel("Giá trị")
-                ax.set_ylabel("Số lượng")
-                plt.xticks(rotation=45)
-                st.pyplot(fig)
-        
-        with col_a2:
-            st.write("**Kiểu dữ liệu từng cột:**")
-            dtype_info = pd.DataFrame({
-                'Cột': df.columns,
-                'Kiểu': df.dtypes.astype(str),
-                'Trống': df.isnull().sum()
-            })
-            st.dataframe(dtype_info, width='stretch')
+print(f"  5️⃣  Sheet 'Doanh số tháng': {len(df_revenue)} dòng")
+print(f"      Cột: {', '.join(df_revenue.columns.tolist())}\n")
 
-else:
-    st.info("📥 Chọn nguồn dữ liệu ở sidebar để bắt đầu phân tích")
+print(f"  6️⃣  Sheet 'Thống kê': {len(df_summary)} dòng")
+print(f"      Cół: {', '.join(df_summary.columns.tolist())}\n")
 
-# ===== FOOTER =====
-st.markdown("---")
-st.markdown(
-    """
-    <div style='text-align: center; color: gray; font-size: 12px;'>
-    <p>📊 Dashboard Phân Tích Dữ Liệu v2.0 | Tạo bằng Streamlit | Cập nhật: 2025-12-21</p>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+print("🚀 Bạn có thể upload file này vào Streamlit Dashboard!")
