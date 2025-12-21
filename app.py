@@ -34,18 +34,31 @@ class DataHandler:
     @staticmethod
     @st.cache_data
     def load_file(file) -> Optional[pd.DataFrame]:
-        """Load file"""
+        """Load file với xử lý lỗi chi tiết"""
         try:
             if file.name.endswith('.csv'):
-                df = pd.read_csv(file, low_memory=False)
+                # Load CSV với nhiều cách khác nhau
+                try:
+                    df = pd.read_csv(file, low_memory=False)
+                except:
+                    # Thử load lại với encoding khác
+                    file.seek(0)
+                    df = pd.read_csv(file, low_memory=False, encoding='latin-1')
             else:
                 df = pd.read_excel(file)
+            
+            # Debug info
+            st.write(f"**📊 Thông tin file:**")
+            st.write(f"- Shape: {df.shape}")
+            st.write(f"- Dtypes:\n{df.dtypes}")
+            st.write(f"- Columns: {list(df.columns)}")
+            st.write(f"- Nulls:\n{df.isnull().sum()}")
             
             logger.info(f"✅ Loaded: {df.shape}")
             return df
         except Exception as e:
             logger.error(f"❌ Load error: {str(e)}")
-            st.error(f"❌ Lỗi: {str(e)}")
+            st.error(f"❌ Lỗi load file: {str(e)}")
             return None
     
     @staticmethod
@@ -63,15 +76,24 @@ class DataHandler:
     
     @staticmethod
     def convert_types(df: pd.DataFrame) -> pd.DataFrame:
-        """Chuyển đổi kiểu"""
+        """Chuyển đổi kiểu - xử lý tốt hơn"""
         try:
             df_converted = df.copy()
             
             for col in df_converted.columns:
+                # Bỏ qua cột trống hoàn toàn
+                if df_converted[col].isnull().all():
+                    continue
+                
                 if df_converted[col].dtype == 'object':
+                    # Clean whitespace
                     df_converted[col] = df_converted[col].astype(str).str.strip()
                     
-                    # Thử số
+                    # Skip if all 'None' string
+                    if (df_converted[col] == 'None').all():
+                        continue
+                    
+                    # Try numeric
                     try:
                         df_converted[col] = pd.to_numeric(
                             df_converted[col].str.replace(',', '', regex=False),
@@ -81,7 +103,7 @@ class DataHandler:
                     except:
                         pass
                     
-                    # Thử datetime
+                    # Try datetime
                     try:
                         df_converted[col] = pd.to_datetime(
                             df_converted[col],
@@ -398,7 +420,12 @@ def main():
     # Process
     if df is not None:
         st.success("✅ Tải thành công")
+        
+        # Convert types
         df = DataHandler.convert_types(df)
+        
+        # Remove completely empty columns
+        df = df.dropna(axis=1, how='all')
         
         st.info(f"📊 {len(df):,} dòng × {len(df.columns)} cột")
         
