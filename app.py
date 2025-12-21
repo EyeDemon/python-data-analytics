@@ -12,7 +12,6 @@ from datetime import datetime
 from typing import Optional, Tuple, List
 import logging
 import io
-import chardet
 
 # ===== LOGGING =====
 logging.basicConfig(
@@ -35,14 +34,21 @@ class RobustDataHandler:
     
     @staticmethod
     def detect_encoding(file) -> str:
-        """Phát hiện encoding của file"""
+        """Phát hiện encoding của file - không cần chardet"""
         try:
             file.seek(0)
             raw_data = file.read(10000)
-            result = chardet.detect(raw_data)
-            encoding = result.get('encoding', 'utf-8')
             file.seek(0)
-            return encoding if encoding else 'utf-8'
+            
+            # Thử các encoding phổ biến
+            encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252', 'utf-16']
+            for enc in encodings:
+                try:
+                    raw_data.decode(enc)
+                    return enc
+                except:
+                    continue
+            return 'utf-8'
         except:
             return 'utf-8'
     
