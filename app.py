@@ -277,6 +277,21 @@ def render_data_tab(df: pd.DataFrame):
     with col1:
         st.metric("📊 Dòng", f"{len(df):,}")
     with col2:
+        y_columns = st.multiselect("Trục Y:", numeric_cols, key="chart_y")
+    
+    with col3:
+        # Thêm cột Z vào Y
+        z_col = st.selectbox(
+            "Cột Z (tùy chọn):",
+            [None] + numeric_cols,
+            help="Chọn cột Z để thêm vào biểu đồ",
+            key="chart_z"
+        )
+        
+        chart_type = st.selectbox(
+            "Loại:", ["📊 Cột", "📈 Đường", "📉 Vùng", "🔵 Phân tán", "📐 Heatmap"],
+            key="chart_type"
+        )
         st.metric("📈 Cột", len(df.columns))
     with col3:
         numeric_count = len(df.select_dtypes(include=['float64', 'int64']).columns)
@@ -318,7 +333,7 @@ def render_chart_tab(df: pd.DataFrame):
     """Tab biểu đồ"""
     st.header("📈 Biểu Đồ")
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     
     all_cols = df.columns.tolist()
     numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
@@ -334,8 +349,17 @@ def render_chart_tab(df: pd.DataFrame):
         y_cols = st.multiselect("Trục Y:", numeric_cols, key="chart_y")
     
     with col3:
+        z_col = st.selectbox(
+            "Trục Z (3D):",
+            [None] + numeric_cols,
+            index=0,
+            help="Chọn để vẽ biểu đồ 3D",
+            key="chart_z"
+        )
+    
+    with col4:
         chart_type = st.selectbox(
-            "Loại:", ["📊 Cột", "📈 Đường", "📉 Vùng", "🔵 Phân tán", "📐 Heatmap"],
+            "Loại:", ["📊 Cột", "📈 Đường", "📉 Vùng", "🔵 Phân tán", "📐 Heatmap", "🎲 3D Scatter"],
             key="chart_type"
         )
     
@@ -359,6 +383,56 @@ def render_chart_tab(df: pd.DataFrame):
             return
         
         try:
+            # ===== 3D SCATTER =====
+            if "3D" in chart_type and z_col:
+                st.subheader(f"📊 3D: {y_cols[0]} vs {x_col} vs {z_col}")
+                
+                df_3d = df[[x_col, y_cols[0], z_col]].dropna()
+                
+                if len(df_3d) == 0:
+                    st.error("❌ Không có dữ liệu")
+                    return
+                
+                try:
+                    from mpl_toolkits.mplot3d import Axes3D
+                    
+                    fig = plt.figure(figsize=(figsize_w, figsize_h))
+                    ax = fig.add_subplot(111, projection='3d')
+                    
+                    # Chuyển X sang số nếu là text
+                    if df_3d[x_col].dtype == 'object':
+                        x_numeric = pd.factorize(df_3d[x_col])[0]
+                        x_label = x_col
+                    else:
+                        x_numeric = df_3d[x_col]
+                        x_label = x_col
+                    
+                    scatter = ax.scatter(
+                        x_numeric,
+                        df_3d[y_cols[0]],
+                        df_3d[z_col],
+                        c=df_3d[z_col],
+                        cmap='viridis',
+                        s=100,
+                        alpha=0.6
+                    )
+                    
+                    ax.set_xlabel(x_label)
+                    ax.set_ylabel(y_cols[0])
+                    ax.set_zlabel(z_col)
+                    ax.set_title(f"3D: {y_cols[0]} vs {x_col} vs {z_col}")
+                    
+                    fig.colorbar(scatter, ax=ax, label=z_col)
+                    st.pyplot(fig)
+                    plt.close(fig)
+                
+                except Exception as e:
+                    logger.error(f"3D chart error: {str(e)}")
+                    st.error(f"❌ {str(e)}")
+                
+                return
+            
+            # ===== 2D CHARTS =====
             df_chart = df[[x_col] + y_cols].copy()
             
             if remove_nulls:
@@ -504,6 +578,20 @@ def main():
             return
         
         st.success(f"✅ Ready: {len(df):,} dòng × {len(df.columns)} cột")
+        
+        # ===== CHỌN CỘT Z =====
+        st.sidebar.header("🎯 Chọn Cột Z")
+        all_cols = df.columns.tolist()
+        selected_z = st.sidebar.selectbox(
+            "Chọn cột làm cột Z:",
+            all_cols,
+            help="Cột Z sẽ được sử dụng cho các tính toán đặc biệt",
+            key="select_z_col"
+        )
+        
+        if selected_z:
+            st.sidebar.success(f"✅ Đã chọn: **{selected_z}**")
+            # Có thể sử dụng selected_z trong các tính toán sau này
         
         # Tabs
         tab1, tab2, tab3, tab4 = st.tabs(["📋 Dữ liệu", "📈 Biểu đồ", "📊 Thống kê", "🔍 Phân tích"])
