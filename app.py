@@ -44,21 +44,17 @@ st.markdown("---")
 def load_file(file):
     """Load CSV or Excel file with error handling"""
     try:
-        st.info("⏳ Loading file...")
-        
         if file.name.endswith('.csv'):
             try:
                 file.seek(0)
                 df = pd.read_csv(file, low_memory=False)
                 logger.info(f"✅ CSV loaded: {df.shape}")
-                st.success(f"✅ CSV loaded: {df.shape}")
                 return df
             except Exception as e:
                 try:
                     file.seek(0)
                     df = pd.read_csv(file, low_memory=False, encoding='latin-1')
                     logger.info(f"✅ CSV loaded (latin-1): {df.shape}")
-                    st.success(f"✅ CSV loaded (latin-1): {df.shape}")
                     return df
                 except Exception as e2:
                     logger.error(f"CSV error: {str(e2)}")
@@ -68,7 +64,6 @@ def load_file(file):
             file.seek(0)
             df = pd.read_excel(file)
             logger.info(f"✅ Excel loaded: {df.shape}")
-            st.success(f"✅ Excel loaded: {df.shape}")
             return df
     except Exception as e:
         logger.error(f"Load error: {str(e)}")
