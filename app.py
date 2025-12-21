@@ -8,10 +8,6 @@ import numpy as np
 st.set_page_config(page_title="Dashboard Tùy Chỉnh", layout="wide")
 st.title("Phân Tích Dữ Liệu Tự Do 🛠️")
 st.markdown("---")
-url = "https://raw.githubusercontent.com/YOUR_USERNAME/python-data-analytics/main/data.csv"
-
-# Đọc file
-df = pd.read_csv(url)
 # --- HÀM ĐỌC DỮ LIỆU ---
 @st.cache_data
 def load_data(uploaded_file):
