@@ -297,12 +297,12 @@ def render_data_tab(df: pd.DataFrame):
         try:
             df_search = df[df[search_col].astype(str).str.contains(search_val, case=False, na=False)]
             st.write(f"✅ Tìm được {len(df_search)} kết quả:")
-            st.dataframe(df_search, width='stretch', height=400)
+            st.dataframe(df_search, use_container_width=True, height=400)
         except:
             st.warning("⚠️ Không tìm được")
     else:
         st.write("**Dữ liệu (20 dòng đầu):**")
-        st.dataframe(df.head(20), width='stretch', height=400)
+        st.dataframe(df.head(20), use_container_width=True, height=400)
     
     # Download
     csv = df.to_csv(index=False, encoding='utf-8-sig')
@@ -419,7 +419,7 @@ def render_chart_tab(df: pd.DataFrame):
                     st.warning("⚠️ Cần ít nhất 2 cột số")
             
             with st.expander("📊 Dữ liệu"):
-                st.dataframe(chart_data, width='stretch')
+                st.dataframe(chart_data, use_container_width=True)
         
         except Exception as e:
             logger.error(f"Chart error: {str(e)}")
@@ -438,7 +438,7 @@ def render_stats_tab(df: pd.DataFrame):
     
     st.write("**Thống kê chi tiết:**")
     stats_df = df[numeric_cols].describe().T
-    st.dataframe(stats_df, width='stretch')
+    st.dataframe(stats_df, use_container_width=True)
 
 # ===== ANALYSIS TAB =====
 def render_analysis_tab(df: pd.DataFrame):
@@ -455,7 +455,7 @@ def render_analysis_tab(df: pd.DataFrame):
             'Trống': df.isnull().sum(),
             'Trống %': (df.isnull().sum() / len(df) * 100).round(1)
         })
-        st.dataframe(dtype_info, width='stretch', height=400)
+        st.dataframe(dtype_info, use_container_width=True, height=400)
     
     with col2:
         st.write("**Giá trị duy nhất:**")
@@ -464,7 +464,7 @@ def render_analysis_tab(df: pd.DataFrame):
             'Unique': df.nunique(),
             '% Duy nhất': (df.nunique() / len(df) * 100).round(1)
         })
-        st.dataframe(unique_info, width='stretch', height=400)
+        st.dataframe(unique_info, use_container_width=True, height=400)
 
 # ===== MAIN =====
 def main():
