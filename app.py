@@ -1,6 +1,6 @@
 """
-📊 Educational Data Dashboard
-Tối ưu cho dữ liệu học viên/sinh viên
+🎓 Educational Data Dashboard - Robust Version
+Xử lý tất cả trường hợp None/lỗi
 """
 
 import streamlit as st
@@ -11,6 +11,8 @@ import seaborn as sns
 from datetime import datetime
 from typing import Optional, Tuple, List
 import logging
+import io
+import chardet
 
 # ===== LOGGING =====
 logging.basicConfig(
@@ -27,95 +29,226 @@ class Config:
     MAX_ROWS = 1000000
     ALLOWED_EXTENSIONS = ['csv', 'xlsx', 'xls']
 
-# ===== DATA HANDLER =====
-class DataHandler:
-    """Xử lý dữ liệu"""
+# ===== ROBUST DATA HANDLER =====
+class RobustDataHandler:
+    """Xử lý dữ liệu - Xử lý tất cả lỗi"""
+    
+    @staticmethod
+    def detect_encoding(file) -> str:
+        """Phát hiện encoding của file"""
+        try:
+            file.seek(0)
+            raw_data = file.read(10000)
+            result = chardet.detect(raw_data)
+            encoding = result.get('encoding', 'utf-8')
+            file.seek(0)
+            return encoding if encoding else 'utf-8'
+        except:
+            return 'utf-8'
+    
+    @staticmethod
+    def detect_separator(file) -> str:
+        """Phát hiện separator của CSV"""
+        try:
+            file.seek(0)
+            sample = file.read(1024).decode('utf-8', errors='ignore')
+            file.seek(0)
+            
+            separators = [',', ';', '\t', '|']
+            for sep in separators:
+                if sep in sample:
+                    return sep
+            return ','
+        except:
+            return ','
     
     @staticmethod
     @st.cache_data
     def load_file(file) -> Optional[pd.DataFrame]:
-        """Load file với xử lý lỗi chi tiết"""
+        """Load file với xử lý lỗi toàn diện"""
         try:
+            if not file:
+                st.error("❌ Chưa chọn file")
+                return None
+            
+            st.info("⏳ Đang tải file...")
+            
+            # ===== CSV =====
             if file.name.endswith('.csv'):
-                # Load CSV với nhiều cách khác nhau
                 try:
-                    df = pd.read_csv(file, low_memory=False)
-                except:
-                    # Thử load lại với encoding khác
+                    # Cách 1: Mặc định
                     file.seek(0)
-                    df = pd.read_csv(file, low_memory=False, encoding='latin-1')
+                    df = pd.read_csv(file, low_memory=False)
+                    
+                    if df.empty or df.isnull().all().all():
+                        raise ValueError("DataFrame trống")
+                    
+                    logger.info(f"✅ CSV loaded (default): {df.shape}")
+                    st.success(f"✅ CSV loaded: {df.shape}")
+                    return df
+                
+                except Exception as e1:
+                    logger.warning(f"Default CSV load failed: {str(e1)}")
+                    
+                    try:
+                        # Cách 2: Detect encoding
+                        encoding = RobustDataHandler.detect_encoding(file)
+                        logger.info(f"Trying encoding: {encoding}")
+                        file.seek(0)
+                        df = pd.read_csv(file, low_memory=False, encoding=encoding)
+                        
+                        if df.empty or df.isnull().all().all():
+                            raise ValueError("DataFrame trống")
+                        
+                        logger.info(f"✅ CSV loaded (encoding={encoding}): {df.shape}")
+                        st.success(f"✅ CSV loaded ({encoding}): {df.shape}")
+                        return df
+                    
+                    except Exception as e2:
+                        logger.warning(f"Encoding load failed: {str(e2)}")
+                        
+                        try:
+                            # Cách 3: Detect separator
+                            separator = RobustDataHandler.detect_separator(file)
+                            logger.info(f"Trying separator: '{separator}'")
+                            file.seek(0)
+                            df = pd.read_csv(file, sep=separator, low_memory=False)
+                            
+                            if df.empty or df.isnull().all().all():
+                                raise ValueError("DataFrame trống")
+                            
+                            logger.info(f"✅ CSV loaded (sep='{separator}'): {df.shape}")
+                            st.success(f"✅ CSV loaded (sep='{separator}'): {df.shape}")
+                            return df
+                        
+                        except Exception as e3:
+                            logger.warning(f"Separator load failed: {str(e3)}")
+                            
+                            try:
+                                # Cách 4: Encoding latin-1
+                                logger.info("Trying encoding: latin-1")
+                                file.seek(0)
+                                df = pd.read_csv(file, low_memory=False, encoding='latin-1')
+                                
+                                if df.empty or df.isnull().all().all():
+                                    raise ValueError("DataFrame trống")
+                                
+                                logger.info(f"✅ CSV loaded (latin-1): {df.shape}")
+                                st.success(f"✅ CSV loaded (latin-1): {df.shape}")
+                                return df
+                            
+                            except Exception as e4:
+                                logger.error(f"CSV load failed all methods: {str(e4)}")
+                                st.error(f"❌ Không thể load CSV: {str(e4)}")
+                                return None
+            
+            # ===== EXCEL =====
+            elif file.name.endswith(('.xlsx', '.xls')):
+                try:
+                    file.seek(0)
+                    df = pd.read_excel(file)
+                    
+                    if df.empty or df.isnull().all().all():
+                        raise ValueError("DataFrame trống")
+                    
+                    logger.info(f"✅ Excel loaded: {df.shape}")
+                    st.success(f"✅ Excel loaded: {df.shape}")
+                    return df
+                
+                except Exception as e:
+                    logger.error(f"Excel load error: {str(e)}")
+                    st.error(f"❌ Không thể load Excel: {str(e)}")
+                    return None
+            
             else:
-                df = pd.read_excel(file)
-            
-            # Debug info
-            st.write(f"**📊 Thông tin file:**")
-            st.write(f"- Shape: {df.shape}")
-            st.write(f"- Dtypes:\n{df.dtypes}")
-            st.write(f"- Columns: {list(df.columns)}")
-            st.write(f"- Nulls:\n{df.isnull().sum()}")
-            
-            logger.info(f"✅ Loaded: {df.shape}")
-            return df
+                st.error("❌ File type không được hỗ trợ")
+                return None
+        
         except Exception as e:
-            logger.error(f"❌ Load error: {str(e)}")
-            st.error(f"❌ Lỗi load file: {str(e)}")
+            logger.error(f"Unexpected error: {str(e)}")
+            st.error(f"❌ Lỗi không mong muốn: {str(e)}")
             return None
     
     @staticmethod
-    @st.cache_data
-    def load_url(url: str) -> Optional[pd.DataFrame]:
-        """Load từ URL"""
+    def clean_data(df: pd.DataFrame) -> pd.DataFrame:
+        """Làm sạch dữ liệu"""
         try:
-            df = pd.read_csv(url)
-            logger.info(f"✅ Loaded from URL: {df.shape}")
+            # Xóa cột trống hoàn toàn
+            df = df.dropna(axis=1, how='all')
+            
+            # Xóa hàng trống hoàn toàn
+            df = df.dropna(axis=0, how='all')
+            
+            # Reset index
+            df = df.reset_index(drop=True)
+            
+            # Rename columns - loại bỏ spaces
+            df.columns = df.columns.str.strip()
+            
+            logger.info(f"✅ Data cleaned: {df.shape}")
             return df
+        
         except Exception as e:
-            logger.error(f"❌ URL load error: {str(e)}")
-            st.error(f"❌ Lỗi: {str(e)}")
-            return None
+            logger.error(f"Clean error: {str(e)}")
+            return df
     
     @staticmethod
     def convert_types(df: pd.DataFrame) -> pd.DataFrame:
-        """Chuyển đổi kiểu - xử lý tốt hơn"""
+        """Chuyển đổi kiểu dữ liệu thông minh"""
         try:
             df_converted = df.copy()
             
             for col in df_converted.columns:
-                # Bỏ qua cột trống hoàn toàn
-                if df_converted[col].isnull().all():
-                    continue
+                try:
+                    # Bỏ qua cột trống hoàn toàn
+                    if df_converted[col].isnull().all():
+                        continue
+                    
+                    # Convert object columns
+                    if df_converted[col].dtype == 'object':
+                        # Clean
+                        df_converted[col] = df_converted[col].astype(str).str.strip()
+                        
+                        # Remove 'None' strings
+                        df_converted[col] = df_converted[col].replace('None', np.nan)
+                        df_converted[col] = df_converted[col].replace('none', np.nan)
+                        df_converted[col] = df_converted[col].replace('', np.nan)
+                        
+                        # Try numeric
+                        try:
+                            numeric_col = pd.to_numeric(
+                                df_converted[col].str.replace(',', '', regex=False),
+                                errors='coerce'
+                            )
+                            # If most values converted, use it
+                            if numeric_col.notna().sum() / len(numeric_col) > 0.5:
+                                df_converted[col] = numeric_col
+                                continue
+                        except:
+                            pass
+                        
+                        # Try datetime
+                        try:
+                            datetime_col = pd.to_datetime(
+                                df_converted[col],
+                                errors='coerce'
+                            )
+                            # If most values converted, use it
+                            if datetime_col.notna().sum() / len(datetime_col) > 0.5:
+                                df_converted[col] = datetime_col
+                                continue
+                        except:
+                            pass
                 
-                if df_converted[col].dtype == 'object':
-                    # Clean whitespace
-                    df_converted[col] = df_converted[col].astype(str).str.strip()
-                    
-                    # Skip if all 'None' string
-                    if (df_converted[col] == 'None').all():
-                        continue
-                    
-                    # Try numeric
-                    try:
-                        df_converted[col] = pd.to_numeric(
-                            df_converted[col].str.replace(',', '', regex=False),
-                            errors='coerce'
-                        )
-                        continue
-                    except:
-                        pass
-                    
-                    # Try datetime
-                    try:
-                        df_converted[col] = pd.to_datetime(
-                            df_converted[col],
-                            errors='coerce'
-                        )
-                    except:
-                        pass
+                except Exception as col_error:
+                    logger.warning(f"Column {col} conversion failed: {str(col_error)}")
+                    continue
             
             logger.info("✅ Types converted")
             return df_converted
+        
         except Exception as e:
-            logger.error(f"❌ Conversion error: {str(e)}")
+            logger.error(f"Convert types error: {str(e)}")
             return df
 
 # ===== PAGE SETUP =====
@@ -140,20 +273,29 @@ def render_data_tab(df: pd.DataFrame):
     with col2:
         st.metric("📈 Cột", len(df.columns))
     with col3:
-        st.metric("🔢 Số cột", len(df.select_dtypes(include=['float64', 'int64']).columns))
+        numeric_count = len(df.select_dtypes(include=['float64', 'int64']).columns)
+        st.metric("🔢 Số cột", numeric_count)
     with col4:
-        st.metric("📝 Cột chữ", len(df.select_dtypes(include=['object']).columns))
+        object_count = len(df.select_dtypes(include=['object']).columns)
+        st.metric("📝 Chữ cột", object_count)
     
     # Search
-    search_col = st.selectbox("🔍 Tìm kiếm theo cột:", df.columns)
-    search_val = st.text_input("Nhập giá trị:")
+    col_search, val_search = st.columns([1, 2])
+    with col_search:
+        search_col = st.selectbox("🔍 Tìm kiếm:", df.columns, key="search_col")
     
-    if search_val:
-        df_search = df[df[search_col].astype(str).str.contains(search_val, case=False, na=False)]
-        st.write(f"Tìm được {len(df_search)} kết quả:")
-        st.dataframe(df_search, width='stretch', height=400)
+    with val_search:
+        search_val = st.text_input("Giá trị:", key="search_val")
+    
+    if search_val and search_col:
+        try:
+            df_search = df[df[search_col].astype(str).str.contains(search_val, case=False, na=False)]
+            st.write(f"✅ Tìm được {len(df_search)} kết quả:")
+            st.dataframe(df_search, width='stretch', height=400)
+        except:
+            st.warning("⚠️ Không tìm được")
     else:
-        st.write("**Dữ liệu mẫu (20 dòng đầu):**")
+        st.write("**Dữ liệu (20 dòng đầu):**")
         st.dataframe(df.head(20), width='stretch', height=400)
     
     # Download
@@ -175,42 +317,42 @@ def render_chart_tab(df: pd.DataFrame):
     all_cols = df.columns.tolist()
     numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
     
+    if not numeric_cols:
+        st.warning("⚠️ Không có cột số để vẽ biểu đồ")
+        return
+    
     with col1:
-        x_col = st.selectbox("Trục X:", all_cols)
+        x_col = st.selectbox("Trục X:", all_cols, key="chart_x")
     
     with col2:
-        y_cols = st.multiselect("Trục Y (số):", numeric_cols)
+        y_cols = st.multiselect("Trục Y:", numeric_cols, key="chart_y")
     
     with col3:
         chart_type = st.selectbox(
-            "Loại:",
-            ["📊 Cột", "📈 Đường", "📉 Vùng", "🔵 Phân tán", "📐 Heatmap"]
+            "Loại:", ["📊 Cột", "📈 Đường", "📉 Vùng", "🔵 Phân tán", "📐 Heatmap"],
+            key="chart_type"
         )
     
-    # Options
     with st.expander("⚙️ Tùy chọn"):
         col_opt1, col_opt2, col_opt3 = st.columns(3)
         
         with col_opt1:
-            use_groupby = st.checkbox("Gom nhóm", value=True)
-            remove_nulls = st.checkbox("Xóa trống", value=False)
+            use_groupby = st.checkbox("Gom nhóm", value=True, key="groupby")
+            remove_nulls = st.checkbox("Xóa trống", value=False, key="remove_null")
         
         with col_opt2:
-            figsize_w = st.slider("Rộng", 6, 16, 10)
-            figsize_h = st.slider("Cao", 4, 12, 6)
+            figsize_w = st.slider("Rộng", 6, 16, 10, key="width")
+            figsize_h = st.slider("Cao", 4, 12, 6, key="height")
         
         with col_opt3:
-            sort_asc = st.checkbox("Sắp xếp A→Z", value=True)
-            show_values = st.checkbox("Hiện giá trị", value=False)
+            sort_asc = st.checkbox("A→Z", value=True, key="sort")
     
-    # Draw
     if st.button("🚀 Vẽ biểu đồ", use_container_width=True):
         if not y_cols:
             st.warning("⚠️ Chọn ít nhất 1 cột Y")
             return
         
         try:
-            # Prepare
             df_chart = df[[x_col] + y_cols].copy()
             
             if remove_nulls:
@@ -220,7 +362,6 @@ def render_chart_tab(df: pd.DataFrame):
                 st.error("❌ Không có dữ liệu")
                 return
             
-            # Process
             if use_groupby and (df[x_col].dtype == 'object' or 
                                len(df[x_col].unique()) < len(df) / 2):
                 chart_data = df_chart.groupby(x_col)[y_cols].sum()
@@ -234,21 +375,16 @@ def render_chart_tab(df: pd.DataFrame):
                 except:
                     pass
             
-            # Plot
             st.subheader(f"📊 {', '.join(y_cols)} theo {x_col}")
             
             if "Cột" in chart_type:
                 st.bar_chart(chart_data)
-            
             elif "Đường" in chart_type:
                 st.line_chart(chart_data)
-            
             elif "Vùng" in chart_type:
                 st.area_chart(chart_data)
-            
             elif "Phân tán" in chart_type:
                 fig, ax = plt.subplots(figsize=(figsize_w, figsize_h))
-                
                 df_scatter = df.dropna(subset=[x_col] + y_cols)
                 
                 if df_scatter[x_col].dtype == 'object':
@@ -257,36 +393,27 @@ def render_chart_tab(df: pd.DataFrame):
                     x_numeric = df_scatter[x_col]
                 
                 for y_col in y_cols:
-                    ax.scatter(x_numeric, df_scatter[y_col], 
-                              label=y_col, alpha=0.6, s=100)
+                    ax.scatter(x_numeric, df_scatter[y_col], label=y_col, alpha=0.6, s=100)
                 
                 ax.set_xlabel(x_col)
                 ax.set_ylabel("Giá trị")
                 ax.legend()
                 ax.grid(True, alpha=0.3)
                 st.pyplot(fig)
+                plt.close(fig)
             
             elif "Heatmap" in chart_type:
                 if len(numeric_cols) > 1:
                     corr = df[numeric_cols].corr()
                     fig, ax = plt.subplots(figsize=(10, 8))
-                    sns.heatmap(corr, annot=True, fmt='.2f', 
-                               cmap='coolwarm', ax=ax)
+                    sns.heatmap(corr, annot=True, fmt='.2f', cmap='coolwarm', ax=ax)
                     st.pyplot(fig)
+                    plt.close(fig)
                 else:
                     st.warning("⚠️ Cần ít nhất 2 cột số")
             
-            # Show data
-            with st.expander("📊 Dữ liệu biểu đồ"):
+            with st.expander("📊 Dữ liệu"):
                 st.dataframe(chart_data, width='stretch')
-                
-                csv_chart = chart_data.to_csv(encoding='utf-8-sig')
-                st.download_button(
-                    "⬇️ Tải dữ liệu",
-                    data=csv_chart,
-                    file_name=f"chart_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    mime="text/csv"
-                )
         
         except Exception as e:
             logger.error(f"Chart error: {str(e)}")
@@ -303,32 +430,9 @@ def render_stats_tab(df: pd.DataFrame):
         st.warning("⚠️ Không có cột số")
         return
     
-    # Basic stats
     st.write("**Thống kê chi tiết:**")
     stats_df = df[numeric_cols].describe().T
     st.dataframe(stats_df, width='stretch')
-    
-    # Column stats
-    st.write("**Thống kê từng cột:**")
-    col_select = st.selectbox("Chọn cột:", numeric_cols)
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Min", f"{df[col_select].min():,.0f}")
-    with col2:
-        st.metric("Max", f"{df[col_select].max():,.0f}")
-    with col3:
-        st.metric("Avg", f"{df[col_select].mean():,.0f}")
-    with col4:
-        st.metric("Std", f"{df[col_select].std():,.0f}")
-    
-    # Distribution
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.hist(df[col_select].dropna(), bins=30, color='skyblue', edgecolor='black')
-    ax.set_title(f"Phân bố {col_select}")
-    ax.set_xlabel("Giá trị")
-    ax.set_ylabel("Tần số")
-    st.pyplot(fig)
 
 # ===== ANALYSIS TAB =====
 def render_analysis_tab(df: pd.DataFrame):
@@ -337,105 +441,66 @@ def render_analysis_tab(df: pd.DataFrame):
     
     col1, col2 = st.columns(2)
     
-    # Categorical
     with col1:
-        st.write("**Phân tích danh mục:**")
-        
-        # Lấy các cột danh mục
-        cat_cols = df.select_dtypes(include=['object']).columns.tolist()
-        
-        if not cat_cols or len(cat_cols) == 0:
-            st.warning("⚠️ Không có cột danh mục")
-        else:
-            try:
-                # Selectbox với default value
-                cat_col = st.selectbox(
-                    "Chọn cột:",
-                    cat_cols,
-                    index=0,  # Chọn cột đầu tiên mặc định
-                    key="analysis_cat_col"
-                )
-                
-                # Kiểm tra cat_col hợp lệ
-                if cat_col and cat_col in df.columns:
-                    top_n = st.slider("Top", 5, 20, 10, key="analysis_top_n")
-                    
-                    # Vẽ biểu đồ
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    value_counts = df[cat_col].value_counts().head(top_n)
-                    value_counts.plot(kind='barh', ax=ax, color='coral')
-                    ax.set_title(f"Top {top_n} {cat_col}")
-                    ax.set_xlabel("Số lượng")
-                    plt.tight_layout()
-                    st.pyplot(fig)
-                    plt.close(fig)
-                else:
-                    st.error("❌ Cột không hợp lệ")
-            except Exception as e:
-                logger.error(f"Analysis error: {str(e)}")
-                st.error(f"❌ Lỗi: {str(e)}")
-    
-    # Data types
-    with col2:
         st.write("**Kiểu dữ liệu:**")
-        try:
-            dtype_info = pd.DataFrame({
-                'Cột': df.columns,
-                'Kiểu': df.dtypes.astype(str),
-                'Trống': df.isnull().sum(),
-                'Trống %': (df.isnull().sum() / len(df) * 100).round(1)
-            })
-            st.dataframe(dtype_info, width='stretch', height=400)
-        except Exception as e:
-            logger.error(f"Dtype error: {str(e)}")
-            st.error(f"❌ Lỗi: {str(e)}")
+        dtype_info = pd.DataFrame({
+            'Cột': df.columns,
+            'Kiểu': df.dtypes.astype(str),
+            'Trống': df.isnull().sum(),
+            'Trống %': (df.isnull().sum() / len(df) * 100).round(1)
+        })
+        st.dataframe(dtype_info, width='stretch', height=400)
+    
+    with col2:
+        st.write("**Giá trị duy nhất:**")
+        unique_info = pd.DataFrame({
+            'Cột': df.columns,
+            'Unique': df.nunique(),
+            '% Duy nhất': (df.nunique() / len(df) * 100).round(1)
+        })
+        st.dataframe(unique_info, width='stretch', height=400)
 
 # ===== MAIN =====
 def main():
     """Hàm chính"""
     setup_page()
     
-    # Sidebar
     st.sidebar.header("📁 Dữ liệu")
-    source = st.sidebar.radio("Nguồn:", ["📤 Upload", "🔗 GitHub"])
+    source = st.sidebar.radio("Nguồn:", ["📤 Upload", "🔗 GitHub"], key="data_source")
     
     df = None
     
     if source == "📤 Upload":
         file = st.sidebar.file_uploader(
             "Chọn file",
-            type=Config.ALLOWED_EXTENSIONS
+            type=Config.ALLOWED_EXTENSIONS,
+            key="file_uploader"
         )
         if file:
-            df = DataHandler.load_file(file)
+            df = RobustDataHandler.load_file(file)
     
     else:
-        url = st.sidebar.text_input(
-            "URL:",
-            "https://raw.githubusercontent.com/.../data.csv"
-        )
-        if st.sidebar.button("Tải"):
-            df = DataHandler.load_url(url)
+        url = st.sidebar.text_input("URL:", key="github_url")
+        if st.sidebar.button("Tải", key="load_github"):
+            try:
+                df = pd.read_csv(url)
+                st.success(f"✅ Loaded: {df.shape}")
+            except Exception as e:
+                st.error(f"❌ {str(e)}")
     
-    # Process
     if df is not None:
-        st.success("✅ Tải thành công")
+        # Clean & convert
+        df = RobustDataHandler.clean_data(df)
+        df = RobustDataHandler.convert_types(df)
         
-        # Convert types
-        df = DataHandler.convert_types(df)
+        if df.empty:
+            st.error("❌ DataFrame rỗng sau xử lý")
+            return
         
-        # Remove completely empty columns
-        df = df.dropna(axis=1, how='all')
-        
-        st.info(f"📊 {len(df):,} dòng × {len(df.columns)} cột")
+        st.success(f"✅ Ready: {len(df):,} dòng × {len(df.columns)} cột")
         
         # Tabs
-        tab1, tab2, tab3, tab4 = st.tabs([
-            "📋 Dữ liệu",
-            "📈 Biểu đồ",
-            "📊 Thống kê",
-            "🔍 Phân tích"
-        ])
+        tab1, tab2, tab3, tab4 = st.tabs(["📋 Dữ liệu", "📈 Biểu đồ", "📊 Thống kê", "🔍 Phân tích"])
         
         with tab1:
             render_data_tab(df)
@@ -450,13 +515,12 @@ def main():
             render_analysis_tab(df)
     
     else:
-        st.info("📥 Upload file hoặc nhập URL ở sidebar")
+        st.info("📥 Upload file hoặc nhập URL")
     
-    # Footer
     st.markdown("---")
     st.markdown(
         "<div style='text-align: center; color: gray; font-size: 12px;'>"
-        "<p>🎓 Educational Dashboard | Optimized for Student Data</p>"
+        "<p>🎓 Robust Dashboard | Xử lý tất cả None/Lỗi</p>"
         "</div>",
         unsafe_allow_html=True
     )
