@@ -318,31 +318,55 @@ def render_analysis_tab(df: pd.DataFrame):
     # Categorical
     with col1:
         st.write("**Phân tích danh mục:**")
-        cat_col = st.selectbox(
-            "Chọn cột danh mục:",
-            df.select_dtypes(include=['object']).columns
-        )
         
-        top_n = st.slider("Top", 5, 20, 10)
+        # Lấy các cột danh mục
+        cat_cols = df.select_dtypes(include=['object']).columns.tolist()
         
-        fig, ax = plt.subplots(figsize=(10, 6))
-        df[cat_col].value_counts().head(top_n).plot(
-            kind='barh', ax=ax, color='coral'
-        )
-        ax.set_title(f"Top {top_n} {cat_col}")
-        ax.set_xlabel("Số lượng")
-        st.pyplot(fig)
+        if not cat_cols or len(cat_cols) == 0:
+            st.warning("⚠️ Không có cột danh mục")
+        else:
+            try:
+                # Selectbox với default value
+                cat_col = st.selectbox(
+                    "Chọn cột:",
+                    cat_cols,
+                    index=0,  # Chọn cột đầu tiên mặc định
+                    key="analysis_cat_col"
+                )
+                
+                # Kiểm tra cat_col hợp lệ
+                if cat_col and cat_col in df.columns:
+                    top_n = st.slider("Top", 5, 20, 10, key="analysis_top_n")
+                    
+                    # Vẽ biểu đồ
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    value_counts = df[cat_col].value_counts().head(top_n)
+                    value_counts.plot(kind='barh', ax=ax, color='coral')
+                    ax.set_title(f"Top {top_n} {cat_col}")
+                    ax.set_xlabel("Số lượng")
+                    plt.tight_layout()
+                    st.pyplot(fig)
+                    plt.close(fig)
+                else:
+                    st.error("❌ Cột không hợp lệ")
+            except Exception as e:
+                logger.error(f"Analysis error: {str(e)}")
+                st.error(f"❌ Lỗi: {str(e)}")
     
     # Data types
     with col2:
         st.write("**Kiểu dữ liệu:**")
-        dtype_info = pd.DataFrame({
-            'Cột': df.columns,
-            'Kiểu': df.dtypes.astype(str),
-            'Trống': df.isnull().sum(),
-            'Trống %': (df.isnull().sum() / len(df) * 100).round(1)
-        })
-        st.dataframe(dtype_info, width='stretch')
+        try:
+            dtype_info = pd.DataFrame({
+                'Cột': df.columns,
+                'Kiểu': df.dtypes.astype(str),
+                'Trống': df.isnull().sum(),
+                'Trống %': (df.isnull().sum() / len(df) * 100).round(1)
+            })
+            st.dataframe(dtype_info, width='stretch', height=400)
+        except Exception as e:
+            logger.error(f"Dtype error: {str(e)}")
+            st.error(f"❌ Lỗi: {str(e)}")
 
 # ===== MAIN =====
 def main():
