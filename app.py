@@ -139,7 +139,7 @@ if df is not None:
         "🔍 Phân tích"
     ])
     
-    # --- TAB 1: DỮLIỆU ---
+    # --- TAB 1: DỮ LIỆU ---
     with tab1:
         st.header("Dữ liệu chi tiết")
         
@@ -147,7 +147,7 @@ if df is not None:
         
         with col_preview:
             st.write("**Dữ liệu mẫu (20 dòng đầu):**")
-            st.dataframe(df.head(20), use_container_width=True)
+            st.dataframe(df.head(20), width='stretch')
         
         with col_info:
             st.write("**Thông tin cơ bản:**")
@@ -161,7 +161,8 @@ if df is not None:
             label="⬇️ Tải CSV",
             data=csv,
             file_name=f"data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
+            mime="text/csv",
+            use_container_width=True
         )
     
     # --- TAB 2: BIỂU ĐỒ ---
@@ -253,7 +254,7 @@ if df is not None:
                         st.pyplot(fig)
                     
                     with st.expander("📊 Xem dữ liệu biểu đồ"):
-                        st.dataframe(chart_data, use_container_width=True)
+                        st.dataframe(chart_data, width='stretch')
                 
                 except Exception as e:
                     st.error(f"❌ Lỗi: {str(e)}")
@@ -277,7 +278,7 @@ if df is not None:
                 st.metric("🔢 Tổng cột", df.shape[1])
             
             st.write("**Thống kê chi tiết:**")
-            st.dataframe(df.describe().T, use_container_width=True)
+            st.dataframe(df.describe().T, width='stretch')
             
             # Ma trận tương quan
             if len(numeric_cols) > 1:
@@ -320,7 +321,7 @@ if df is not None:
                 'Kiểu': df.dtypes.astype(str),
                 'Trống': df.isnull().sum()
             })
-            st.dataframe(dtype_info, use_container_width=True)
+            st.dataframe(dtype_info, width='stretch')
 
 else:
     st.info("📥 Chọn nguồn dữ liệu ở sidebar để bắt đầu phân tích")
@@ -330,7 +331,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray; font-size: 12px;'>
-    <p>📊 Dashboard Phân Tích Dữ Liệu v1.0 | Tạo bằng Streamlit</p>
+    <p>📊 Dashboard Phân Tích Dữ Liệu v2.0 | Tạo bằng Streamlit | Cập nhật: 2025-12-21</p>
     </div>
     """,
     unsafe_allow_html=True
